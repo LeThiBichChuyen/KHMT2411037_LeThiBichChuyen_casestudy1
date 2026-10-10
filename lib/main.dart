@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'add_transaction_screen.dart';
 import 'dashboard_screen.dart';
 import 'database.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Khởi tạo cơ sở dữ liệu SQLite
   await DatabaseHelper.instance.database;
 
   runApp(const ExpenseManagerApp());
@@ -16,9 +17,15 @@ class ExpenseManagerApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false ,
+      debugShowCheckedModeBanner: false,
       title: 'Expense Manager',
-      home: const DashboardScreen(),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF2563EB),
+        ),
+        useMaterial3: true,
+      ),
+      home: const WelcomeScreen(),
     );
   }
 }
@@ -28,147 +35,81 @@ class WelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const primaryColor = Color(0xFF2563EB);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             children: [
-              const SizedBox(height: 120),
-
-              // LOGO
-              SizedBox(
+              const Spacer(flex: 2),
+              Container(
                 width: 120,
-                height: 100,
-                child: Stack(
-                  children: [
-                    Positioned(
-                      top: 5,
-                      left: 30,
-                      child: Container(
-                        width: 70,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF81C784),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                    ),
-
-                    Positioned(
-                      top: 18,
-                      left: 20,
-                      child: Container(
-                        width: 70,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4CAF50),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                    ),
-
-                    Positioned(
-                      bottom: 0,
-                      left: 8,
-                      child: Container(
-                        width: 105,
-                        height: 68,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1976D2),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Container(
-                            width: 43,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0756A6),
-                              borderRadius: BorderRadius.circular(9),
-                            ),
-                            child: const Center(
-                              child: CircleAvatar(
-                                radius: 6,
-                                backgroundColor: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                height: 120,
+                decoration: BoxDecoration(
+                  color: primaryColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(32),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_rounded,
+                  size: 64,
+                  color: primaryColor,
                 ),
               ),
-
-              const SizedBox(height: 25),
-
-              // TÊN ỨNG DỤNG
+              const SizedBox(height: 32),
               const Text(
                 'Expense Manager',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 24,
+                  fontSize: 30,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF10233F),
+                  color: Color(0xFF1E293B),
                 ),
               ),
-
-              const SizedBox(height: 18),
-
-              // MÔ TẢ
+              const SizedBox(height: 16),
               const Text(
-                'Quản lý chi tiêu cá nhân',
+                'Quản lý chi tiêu cá nhân\nđơn giản và hiệu quả',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF8993A4),
+                  fontSize: 17,
+                  height: 1.6,
+                  color: Color(0xFF64748B),
                 ),
               ),
-
-              const Text(
-                'đơn giản và hiệu quả',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF8993A4),
-                ),
-              ),
-
-              const Spacer(),
-
-              // NÚT BẮT ĐẦU
+              const Spacer(flex: 3),
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 54,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.push(
+                    Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
                         builder: (context) =>
-                        const AddTransactionScreen(),
+                        const DashboardScreen(),
                       ),
                     );
                   },
-
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1976D2),
+                    backgroundColor: primaryColor,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   child: const Text(
                     'Bắt đầu',
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
               ),
-
-              const SizedBox(height: 20),
+              const SizedBox(height: 32),
             ],
           ),
         ),

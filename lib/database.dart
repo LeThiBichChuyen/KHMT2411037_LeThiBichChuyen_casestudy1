@@ -1,3 +1,4 @@
+
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -26,7 +27,7 @@ class DatabaseHelper {
     );
   }
 
-  Future _createDB(Database db, int version) async {
+  Future<void> _createDB(Database db, int version) async {
     await db.execute('''
       CREATE TABLE transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,5 +38,48 @@ class DatabaseHelper {
         note TEXT
       )
     ''');
+  }
+
+  // Lấy tất cả giao dịch, giao dịch mới nhất hiển thị trước
+  Future<List<Map<String, dynamic>>> getTransactions() async {
+    final db = await instance.database;
+
+    return await db.query(
+      'transactions',
+      orderBy: 'date DESC, id DESC',
+    );
+  }
+
+  // Thêm giao dịch mới
+  Future<int> insertTransaction(Map<String, dynamic> data) async {
+    final db = await instance.database;
+
+    return await db.insert('transactions', data);
+  }
+
+  // Cập nhật giao dịch
+  Future<int> updateTransaction(
+      int id,
+      Map<String, dynamic> data,
+      ) async {
+    final db = await instance.database;
+
+    return await db.update(
+      'transactions',
+      data,
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // Xóa giao dịch
+  Future<int> deleteTransaction(int id) async {
+    final db = await instance.database;
+
+    return await db.delete(
+      'transactions',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }
