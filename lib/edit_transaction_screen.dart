@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'database.dart';
 
@@ -11,23 +10,18 @@ class EditTransactionScreen extends StatefulWidget {
   });
 
   @override
-  State<EditTransactionScreen> createState() =>
-      _EditTransactionScreenState();
+  State<EditTransactionScreen> createState() => _EditTransactionScreenState();
 }
 
-class _EditTransactionScreenState
-    extends State<EditTransactionScreen> {
+class _EditTransactionScreenState extends State<EditTransactionScreen> {
   bool isExpense = true;
   bool isSaving = false;
 
   String selectedCategory = 'Ăn uống';
   DateTime selectedDate = DateTime.now();
 
-  final TextEditingController amountController =
-  TextEditingController();
-
-  final TextEditingController noteController =
-  TextEditingController();
+  final TextEditingController amountController = TextEditingController();
+  final TextEditingController noteController = TextEditingController();
 
   @override
   void initState() {
@@ -36,34 +30,36 @@ class _EditTransactionScreenState
     final data = widget.transaction;
 
     isExpense = data['type'] == 'Chi tiêu';
-
     selectedCategory = data['category'] ?? 'Ăn uống';
 
-    amountController.text =
-        (data['amount'] ?? '').toString();
+    final rawAmount = data['amount'];
+    if (rawAmount is num) {
+      amountController.text = rawAmount.toInt().toString();
+    } else {
+      amountController.text = (rawAmount ?? '').toString();
+    }
 
     noteController.text = data['note'] ?? '';
 
     final dateText = data['date']?.toString() ?? '';
-
     try {
-      final parts = dateText.split('/');
-      if (parts.length == 3) {
-        selectedDate = DateTime(
-          int.parse(parts[2]),
-          int.parse(parts[1]),
-          int.parse(parts[0]),
-        );
+      if (dateText.contains('-')) {
+        selectedDate = DateTime.parse(dateText);
+      } else if (dateText.contains('/')) {
+        final parts = dateText.split('/');
+        if (parts.length == 3) {
+          selectedDate = DateTime(
+            int.parse(parts[2]),
+            int.parse(parts[1]),
+            int.parse(parts[0]),
+          );
+        }
       }
     } catch (_) {
       selectedDate = DateTime.now();
     }
 
-    if (![
-      'Ăn uống',
-      'Di chuyển',
-      'Mua sắm',
-    ].contains(selectedCategory)) {
+    if (!['Ăn uống', 'Di chuyển', 'Mua sắm', 'Lương'].contains(selectedCategory)) {
       selectedCategory = 'Ăn uống';
     }
   }
@@ -75,10 +71,16 @@ class _EditTransactionScreenState
     super.dispose();
   }
 
-  String formatDate(DateTime date) {
+  String formatDateDisplay(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year}';
+  }
+
+  String formatDateForDb(DateTime date) {
+    return '${date.year}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
   }
 
   Future<void> selectDate() async {
@@ -89,22 +91,28 @@ class _EditTransactionScreenState
       lastDate: DateTime(2030),
     );
 
-    if (pickedDate != null) {
+    if (pickedDate != null && mounted) {
       setState(() {
         selectedDate = pickedDate;
       });
     }
   }
 
-  Future<void> updateTransaction() async {
-    final amount = double.tryParse(
-      amountController.text.trim(),
-    );
+  double? _parseAmount(String input) {
+    final cleaned = input.trim().replaceAll(RegExp(r'[\s.,]'), '');
+    if (cleaned.isEmpty || !RegExp(r'^\d+$').hasMatch(cleaned)) {
+      return null;
+    }
+    return double.tryParse(cleaned);
+  }
 
-    if (amount == null || amount <= 0) {
+  Future<void> updateTransaction() async {
+    final amount = _parseAmount(amountController.text);
+
+    if (amount == null || amount <= 0 || amount > 100000000000) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Vui lòng nhập số tiền hợp lệ'),
+          content: Text('Vui lòng nhập số tiền hợp lệ (> 0 và < 100 tỷ).'),
         ),
       );
       return;
@@ -132,7 +140,7 @@ class _EditTransactionScreenState
           'type': isExpense ? 'Chi tiêu' : 'Thu nhập',
           'category': selectedCategory,
           'amount': amount,
-          'date': formatDate(selectedDate),
+          'date': formatDateForDb(selectedDate),
           'note': noteController.text.trim(),
         },
       );
@@ -200,23 +208,17 @@ class _EditTransactionScreenState
                     child: Container(
                       height: 42,
                       decoration: BoxDecoration(
-                        color: isExpense
-                            ? const Color(0xFFFF6268)
-                            : Colors.white,
+                        color: isExpense ? const Color(0xFFFF6268) : Colors.white,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: isExpense
-                              ? const Color(0xFFFF6268)
-                              : const Color(0xFFE1E5EB),
+                          color: isExpense ? const Color(0xFFFF6268) : const Color(0xFFE1E5EB),
                         ),
                       ),
                       child: Center(
                         child: Text(
                           'Chi tiêu',
                           style: TextStyle(
-                            color: isExpense
-                                ? Colors.white
-                                : const Color(0xFF17243A),
+                            color: isExpense ? Colors.white : const Color(0xFF17243A),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -233,23 +235,17 @@ class _EditTransactionScreenState
                     child: Container(
                       height: 42,
                       decoration: BoxDecoration(
-                        color: !isExpense
-                            ? const Color(0xFF4CAF50)
-                            : Colors.white,
+                        color: !isExpense ? const Color(0xFF4CAF50) : Colors.white,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: !isExpense
-                              ? const Color(0xFF4CAF50)
-                              : const Color(0xFFE1E5EB),
+                          color: !isExpense ? const Color(0xFF4CAF50) : const Color(0xFFE1E5EB),
                         ),
                       ),
                       child: Center(
                         child: Text(
                           'Thu nhập',
                           style: TextStyle(
-                            color: !isExpense
-                                ? Colors.white
-                                : const Color(0xFF17243A),
+                            color: !isExpense ? Colors.white : const Color(0xFF17243A),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -285,8 +281,7 @@ class _EditTransactionScreenState
                       value: 'Ăn uống',
                       child: Row(
                         children: [
-                          Icon(Icons.restaurant,
-                              color: Color(0xFFFF6268)),
+                          Icon(Icons.restaurant, color: Color(0xFFFF6268)),
                           SizedBox(width: 10),
                           Text('Ăn uống'),
                         ],
@@ -296,8 +291,7 @@ class _EditTransactionScreenState
                       value: 'Di chuyển',
                       child: Row(
                         children: [
-                          Icon(Icons.directions_car,
-                              color: Color(0xFFFF6268)),
+                          Icon(Icons.directions_car, color: Color(0xFFFF6268)),
                           SizedBox(width: 10),
                           Text('Di chuyển'),
                         ],
@@ -307,10 +301,19 @@ class _EditTransactionScreenState
                       value: 'Mua sắm',
                       child: Row(
                         children: [
-                          Icon(Icons.shopping_bag,
-                              color: Color(0xFFFF6268)),
+                          Icon(Icons.shopping_bag, color: Color(0xFFFF6268)),
                           SizedBox(width: 10),
                           Text('Mua sắm'),
+                        ],
+                      ),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Lương',
+                      child: Row(
+                        children: [
+                          Icon(Icons.attach_money, color: Color(0xFF4CAF50)),
+                          SizedBox(width: 10),
+                          Text('Lương'),
                         ],
                       ),
                     ),
@@ -335,9 +338,7 @@ class _EditTransactionScreenState
             const SizedBox(height: 8),
             TextField(
               controller: amountController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
+              keyboardType: TextInputType.number,
               decoration: InputDecoration(
                 hintText: 'Nhập số tiền',
                 suffixText: 'đ',
@@ -346,15 +347,11 @@ class _EditTransactionScreenState
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: Color(0xFFE1E5EB),
-                  ),
+                  borderSide: const BorderSide(color: Color(0xFFE1E5EB)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF2674D9),
-                  ),
+                  borderSide: const BorderSide(color: Color(0xFF2674D9)),
                 ),
               ),
             ),
@@ -381,7 +378,7 @@ class _EditTransactionScreenState
                   children: [
                     Expanded(
                       child: Text(
-                        formatDate(selectedDate),
+                        formatDateDisplay(selectedDate),
                         style: const TextStyle(
                           fontSize: 15,
                           color: Color(0xFF17243A),
@@ -416,9 +413,7 @@ class _EditTransactionScreenState
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: Color(0xFFE1E5EB),
-                  ),
+                  borderSide: const BorderSide(color: Color(0xFFE1E5EB)),
                 ),
               ),
             ),
@@ -436,8 +431,13 @@ class _EditTransactionScreenState
                   ),
                 ),
                 child: isSaving
-                    ? const CircularProgressIndicator(
-                  color: Colors.white,
+                    ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 )
                     : const Text(
                   'Cập nhật',

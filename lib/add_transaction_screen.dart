@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'database.dart';
 
@@ -6,23 +5,22 @@ class AddTransactionScreen extends StatefulWidget {
   const AddTransactionScreen({super.key});
 
   @override
-  State<AddTransactionScreen> createState() =>
-      _AddTransactionScreenState();
+  State<AddTransactionScreen> createState() => _AddTransactionScreenState();
 }
 
-class _AddTransactionScreenState
-    extends State<AddTransactionScreen> {
+class _AddTransactionScreenState extends State<AddTransactionScreen> {
   bool isExpense = true;
+  bool isSaving = false;
 
   String selectedCategory = 'Ăn uống';
-
   DateTime selectedDate = DateTime.now();
 
-  final TextEditingController amountController =
-  TextEditingController();
+  final TextEditingController amountController = TextEditingController();
+  final TextEditingController noteController = TextEditingController();
 
-  final TextEditingController noteController =
-  TextEditingController();
+  static const Color primaryColor = Color(0xFF2674D9);
+  static const Color textColor = Color(0xFF17243A);
+  static const Color borderColor = Color(0xFFE1E5EB);
 
   @override
   void dispose() {
@@ -31,10 +29,16 @@ class _AddTransactionScreenState
     super.dispose();
   }
 
-  String formatDate(DateTime date) {
+  String formatDateDisplay(DateTime date) {
     return '${date.day.toString().padLeft(2, '0')}/'
         '${date.month.toString().padLeft(2, '0')}/'
         '${date.year}';
+  }
+
+  String formatDateForDb(DateTime date) {
+    return '${date.year}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
   }
 
   Future<void> selectDate() async {
@@ -45,53 +49,124 @@ class _AddTransactionScreenState
       lastDate: DateTime(2030),
     );
 
-    if (pickedDate != null) {
+    if (pickedDate != null && mounted) {
       setState(() {
         selectedDate = pickedDate;
       });
     }
   }
 
-  Future<void> _saveTransaction() async {
-    final amountText = amountController.text.trim();
-    final amount = double.tryParse(amountText);
+  double? _parseAmount(String input) {
+    final cleaned = input.trim().replaceAll(RegExp(r'[\s.,]'), '');
+    if (cleaned.isEmpty || !RegExp(r'^\d+$').hasMatch(cleaned)) {
+      return null;
+    }
+    return double.tryParse(cleaned);
+  }
 
-    if (amount == null || amount <= 0) {
+  Future<void> _saveTransaction() async {
+    if (isSaving) return;
+
+    final amount = _parseAmount(amountController.text);
+
+    if (amount == null || amount <= 0 || amount > 100000000000) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Vui lòng nhập số tiền hợp lệ!'),
+          content: Text('Vui lòng nhập số tiền hợp lệ (> 0 và < 100 tỷ).'),
         ),
       );
       return;
     }
 
+    setState(() {
+      isSaving = true;
+    });
+
+    final data = <String, dynamic>{
+      'type': isExpense ? 'Chi tiêu' : 'Thu nhập',
+      'category': selectedCategory,
+      'amount': amount,
+      'date': formatDateForDb(selectedDate),
+      'note': noteController.text.trim(),
+    };
+
     try {
-      await DatabaseHelper.instance.insertTransaction({
-        'type': isExpense ? 'Chi tiêu' : 'Thu nhập',
-        'category': selectedCategory,
-        'amount': amount,
-        'date': formatDate(selectedDate),
-        'note': noteController.text.trim(),
-      });
+      final id = await DatabaseHelper.instance.insertTransaction(data);
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã lưu giao dịch thành công!'),
-        ),
-      );
-
-      Navigator.pop(context, true);
+      if (id > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã lưu giao dịch thành công!')),
+        );
+        Navigator.pop(context, true);
+      } else {
+        setState(() {
+          isSaving = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không lưu được giao dịch.')),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
-
+      setState(() {
+        isSaving = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Không thể lưu giao dịch: $e'),
-        ),
+        SnackBar(content: Text('Lỗi: $e')),
       );
     }
+  }
+
+  InputDecoration _inputDecoration({required String hint, String? suffix}) {
+    return InputDecoration(
+      hintText: hint,
+      suffixText: suffix,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: borderColor),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: borderColor),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: primaryColor, width: 1.5),
+      ),
+    );
+  }
+
+  Widget _buildTypeButton({
+    required String title,
+    required bool selected,
+    required Color selectedColor,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          height: 44,
+          decoration: BoxDecoration(
+            color: selected ? selectedColor : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: selected ? selectedColor : borderColor),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            title,
+            style: TextStyle(
+              color: selected ? Colors.white : textColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -102,18 +177,13 @@ class _AddTransactionScreenState
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Color(0xFF17243A),
-          ),
-          onPressed: () {
-            Navigator.pop(context);
-          },
+          icon: const Icon(Icons.arrow_back, color: textColor),
+          onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Thêm giao dịch',
           style: TextStyle(
-            color: Color(0xFF17243A),
+            color: textColor,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
@@ -127,279 +197,107 @@ class _AddTransactionScreenState
           children: [
             Row(
               children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        isExpense = true;
-                      });
-                    },
-                    child: Container(
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: isExpense
-                            ? const Color(0xFFFF6268)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isExpense
-                              ? const Color(0xFFFF6268)
-                              : const Color(0xFFE1E5EB),
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'Chi tiêu',
-                          style: TextStyle(
-                            color: isExpense
-                                ? Colors.white
-                                : const Color(0xFF17243A),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                _buildTypeButton(
+                  title: 'Chi tiêu',
+                  selected: isExpense,
+                  selectedColor: const Color(0xFFFF6268),
+                  onTap: () => setState(() => isExpense = true),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        isExpense = false;
-                      });
-                    },
-                    child: Container(
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: !isExpense
-                            ? const Color(0xFF4CAF50)
-                            : Colors.white,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: !isExpense
-                              ? const Color(0xFF4CAF50)
-                              : const Color(0xFFE1E5EB),
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          'Thu nhập',
-                          style: TextStyle(
-                            color: !isExpense
-                                ? Colors.white
-                                : const Color(0xFF17243A),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                _buildTypeButton(
+                  title: 'Thu nhập',
+                  selected: !isExpense,
+                  selectedColor: const Color(0xFF4CAF50),
+                  onTap: () => setState(() => isExpense = false),
                 ),
               ],
             ),
             const SizedBox(height: 22),
-            const Text(
-              'Danh mục',
-              style: TextStyle(
-                color: Color(0xFF17243A),
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            const Text('Danh mục', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Container(
-              height: 52,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: const Color(0xFFE1E5EB),
-                ),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: selectedCategory,
-                  isExpanded: true,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down,
-                    color: Color(0xFF526174),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'Ăn uống',
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 13,
-                            backgroundColor: Color(0xFFFFE5E7),
-                            child: Icon(
-                              Icons.restaurant,
-                              size: 16,
-                              color: Color(0xFFFF6268),
-                            ),
-                          ),
-                          SizedBox(width: 10),
-                          Text('Ăn uống'),
-                        ],
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Di chuyển',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.directions_car,
-                            color: Color(0xFFFF6268),
-                          ),
-                          SizedBox(width: 10),
-                          Text('Di chuyển'),
-                        ],
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Mua sắm',
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.shopping_bag,
-                            color: Color(0xFFFF6268),
-                          ),
-                          SizedBox(width: 10),
-                          Text('Mua sắm'),
-                        ],
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        selectedCategory = value;
-                      });
-                    }
-                  },
-                ),
-              ),
+            DropdownButtonFormField<String>(
+              value: selectedCategory,
+              isExpanded: true,
+              decoration: _inputDecoration(hint: 'Chọn danh mục'),
+              items: const [
+                DropdownMenuItem(value: 'Ăn uống', child: Text('Ăn uống')),
+                DropdownMenuItem(value: 'Di chuyển', child: Text('Di chuyển')),
+                DropdownMenuItem(value: 'Mua sắm', child: Text('Mua sắm')),
+                DropdownMenuItem(value: 'Lương', child: Text('Lương')),
+              ],
+              onChanged: (val) {
+                if (val != null) setState(() => selectedCategory = val);
+              },
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Số tiền',
-              style: TextStyle(
-                color: Color(0xFF17243A),
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            const Text('Số tiền', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
               controller: amountController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Nhập số tiền',
-                suffixText: 'đ',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: Color(0xFFE1E5EB),
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: Color(0xFF2674D9),
-                  ),
-                ),
-              ),
+              keyboardType: TextInputType.number,
+              decoration: _inputDecoration(hint: 'Ví dụ: 50000', suffix: 'đ'),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Ngày giao dịch',
-              style: TextStyle(
-                color: Color(0xFF17243A),
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            const Text('Ngày giao dịch', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            GestureDetector(
+            InkWell(
               onTap: selectDate,
+              borderRadius: BorderRadius.circular(10),
               child: Container(
                 height: 52,
                 padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  border: Border.all(
-                    color: const Color(0xFFE1E5EB),
-                  ),
+                  border: Border.all(color: borderColor),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
                     Expanded(
                       child: Text(
-                        formatDate(selectedDate),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: Color(0xFF17243A),
-                        ),
+                        formatDisplayDate(selectedDate),
+                        style: const TextStyle(fontSize: 15, color: textColor),
                       ),
                     ),
-                    const Icon(
-                      Icons.calendar_month,
-                      color: Color(0xFF526174),
-                    ),
+                    const Icon(Icons.calendar_month, color: Color(0xFF526174)),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Ghi chú',
-              style: TextStyle(
-                color: Color(0xFF17243A),
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            const Text('Ghi chú', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             TextField(
               controller: noteController,
               maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Nhập ghi chú (tùy chọn)',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: Color(0xFFE1E5EB),
-                  ),
-                ),
-              ),
+              decoration: _inputDecoration(hint: 'Nhập ghi chú (tùy chọn)'),
             ),
             const SizedBox(height: 28),
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
-                onPressed: _saveTransaction,
+                onPressed: isSaving ? null : _saveTransaction,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2674D9),
-                  foregroundColor: Colors.white,
+                  backgroundColor: primaryColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                child: const Text(
+                child: isSaving
+                    ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+                    : const Text(
                   'Lưu',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
               ),
@@ -408,5 +306,9 @@ class _AddTransactionScreenState
         ),
       ),
     );
+  }
+
+  String formatDisplayDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 }

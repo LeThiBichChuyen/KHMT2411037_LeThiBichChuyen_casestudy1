@@ -1,17 +1,14 @@
-
-import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
-
   static Database? _database;
 
   DatabaseHelper._init();
 
   Future<Database> get database async {
     if (_database != null) return _database!;
-
     _database = await _initDB('expense_manager.db');
     return _database!;
   }
@@ -40,42 +37,30 @@ class DatabaseHelper {
     ''');
   }
 
-  // Lấy tất cả giao dịch, giao dịch mới nhất hiển thị trước
+  Future<int> insertTransaction(Map<String, dynamic> row) async {
+    final db = await instance.database;
+    return await db.insert('transactions', row);
+  }
+
   Future<List<Map<String, dynamic>>> getTransactions() async {
     final db = await instance.database;
-
-    return await db.query(
-      'transactions',
-      orderBy: 'date DESC, id DESC',
-    );
+    return await db.query('transactions', orderBy: 'date DESC, id DESC');
   }
 
-  // Thêm giao dịch mới
-  Future<int> insertTransaction(Map<String, dynamic> data) async {
+  // PHƯƠNG THỨC CẬP NHẬT GIAO DỊCH (BẮT BUỘC CÓ)
+  Future<int> updateTransaction(int id, Map<String, dynamic> row) async {
     final db = await instance.database;
-
-    return await db.insert('transactions', data);
-  }
-
-  // Cập nhật giao dịch
-  Future<int> updateTransaction(
-      int id,
-      Map<String, dynamic> data,
-      ) async {
-    final db = await instance.database;
-
     return await db.update(
       'transactions',
-      data,
+      row,
       where: 'id = ?',
       whereArgs: [id],
     );
   }
 
-  // Xóa giao dịch
+  // PHƯƠNG THỨC XÓA GIAO DỊCH
   Future<int> deleteTransaction(int id) async {
     final db = await instance.database;
-
     return await db.delete(
       'transactions',
       where: 'id = ?',
